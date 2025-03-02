@@ -53,7 +53,7 @@ impl LLMProvider for GeminiProvider {
             .client
             .generate_content("gemini-2.0-flash", &request)
             .await?;
-        
+
         // Extract and return the first text candidate from the response.
         if let Some(candidates) = response.candidates {
             if let Some(candidate) = candidates.first() {
