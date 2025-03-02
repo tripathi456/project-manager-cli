@@ -1,6 +1,7 @@
 // src/main.rs
 
 use clap::{Parser, Subcommand};
+use docgen::log_prompt;
 use include_dir::{include_dir, Dir};
 use std::env;
 use std::error::Error;
@@ -25,14 +26,6 @@ use template_loader::load_templates;
 /// Embedded prompt_templates folder.
 /// Ensure you have a folder named "prompt_templates" in your project root.
 static EMBEDDED_TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/prompt_templates");
-
-/// Helper function for logging multiline prompts.
-fn log_prompt(title: &str, prompt_text: &str) {
-    info!("{}", title);
-    for (i, line) in prompt_text.lines().enumerate() {
-        info!("  {}: {}", i + 1, line);
-    }
-}
 
 /// CLI definition using Clap.
 #[derive(Parser)]
