@@ -1,0 +1,57 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Dependency directories
+/vendor/
+Cargo.lock
+
+# Logs
+*.log
+errors.log
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+
+# Backup files
+*.bak
+*.backup
+
+# Compiled binary executables
+*.exe
+*.out
+*.app
+
+# Rust debug symbols and profiling data
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Rust coverage reports
+/coverage/
+*.gcno
+*.gcda
+
+# Miscellaneous
+.cargo/
+.rustup/

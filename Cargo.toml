@@ -1,0 +1,26 @@
+[package]
+name = "docgen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.86"
+clap = { version = "4.0", features = ["derive"] }
+colored = "3.0.0"
+flexi_logger = "0.29"
+futures-util = "0.3.31"
+include_dir = "0.7"
+log = "0.4"
+reqwest = { version = "0.12.12", features = ["json"] }
+serde = { version = "1.0.218", features = ["derive"] }
+serde_json = "1.0.139"
+tera = "1.17"
+thiserror = "2.0.11"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1.41"
+tracing-appender = "0.2.3"
+tracing-subscriber = {version =  "0.3.19", features = ["env-filter", "json", "fmt"]}
+
+[dev-dependencies]
+mockall = "0.12.1"
+tempfile = "3.10.1"
