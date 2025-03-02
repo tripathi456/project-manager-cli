@@ -6,6 +6,7 @@ use tracing::{info, error};
 use tera::{Tera, Context};
 
 use crate::llm_provider::LLMProvider;
+use crate::log_prompt;
 
 // Step numbers to output file names and previous file mapping
 pub fn step_mapping() -> HashMap<u32, (&'static str, &'static str)> {
@@ -71,11 +72,8 @@ pub async fn run_single_step<P: AsRef<Path>>(
         // Render the template
         let prompt = tera.render(template_name, &context)?;
         
-        // Log the prompt with line numbers for better traceability
-        info!("Prompt for step {}:", step);
-        for (i, line) in prompt.lines().enumerate() {
-            info!("  Line {}: {}", i + 1, line);
-        }
+        // Log the prompt
+        log_prompt(&format!("Prompt for step {}:", step), &prompt);
         
         // Call the LLM provider
         let response = llm_provider.call_api(&prompt).await?;
@@ -116,10 +114,7 @@ pub async fn generate_github_issues_plan<P: AsRef<Path>>(
     let prompt = tera.render("github_issues_plan.jinja", &context)?;
     
     // Log the prompt
-    info!("Prompt for GitHub issues plan:");
-    for (i, line) in prompt.lines().enumerate() {
-        info!("  Line {}: {}", i + 1, line);
-    }
+    log_prompt("Prompt for GitHub issues plan:", &prompt);
     
     // Call the LLM provider
     let response = llm_provider.call_api(&prompt).await?;
