@@ -1,12 +1,11 @@
-use std::path::PathBuf;
 use std::fs;
 use std::error::Error;
 use async_trait::async_trait;
 use tempfile::tempdir;
 use tera::Context;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 // Import the necessary modules from the crate
-use docgen::types::GenerateContentRequest;
 use docgen::llm_provider::LLMProvider;
 use docgen::pipeline::{run_single_step, generate_github_issues_plan, step_mapping};
 use docgen::template_loader::load_templates;
@@ -15,6 +14,8 @@ use docgen::template_loader::load_templates;
 struct MockLLMProvider {
     // Maps step numbers to response text
     responses: std::collections::HashMap<u32, String>,
+    // Counter to track which step we're on
+    counter: AtomicU32,
 }
 
 impl MockLLMProvider {
@@ -34,33 +35,28 @@ impl MockLLMProvider {
         // Response for GitHub issues plan
         responses.insert(9, "Mock GitHub issues plan response".to_string());
         
-        Self { responses }
+        Self { 
+            responses,
+            counter: AtomicU32::new(1),
+        }
+    }
+    
+    // Reset the counter
+    fn reset_counter(&self) {
+        self.counter.store(1, Ordering::SeqCst);
     }
 }
 
 #[async_trait]
 impl LLMProvider for MockLLMProvider {
     async fn call_api(&self, prompt: &str) -> Result<String, Box<dyn Error>> {
-        // Extract step number from the prompt if possible
-        let step = if prompt.contains("domain analysis") {
-            2
-        } else if prompt.contains("PRD v1") {
-            3
-        } else if prompt.contains("PRD v2") {
-            4
-        } else if prompt.contains("architecture L1") {
-            5
-        } else if prompt.contains("architecture L2") {
-            6
-        } else if prompt.contains("explain architecture") {
-            7
-        } else if prompt.contains("TDD v1") {
-            8
-        } else if prompt.contains("GitHub Issues") {
-            9
-        } else {
-            1
-        };
+        // For GitHub issues plan, we need to use step 9
+        if prompt.contains("GitHub Issues") {
+            return Ok(self.responses.get(&9).unwrap_or(&"Default mock response".to_string()).clone());
+        }
+        
+        // Get the current step from the counter
+        let step = self.counter.fetch_add(1, Ordering::SeqCst);
         
         // Return the corresponding mock response
         Ok(self.responses.get(&step).unwrap_or(&"Default mock response".to_string()).clone())
@@ -101,7 +97,17 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
         };
         
         let full_template_name = format!("{}{}", template_name, template_file);
-        let template_content = format!("This is a test template for step {}.\n\nPrevious output: {{{{ previous_output }}}}", step);
+        let template_content = match step {
+            1 => format!("This is a test template for step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            2 => format!("This is a test template for domain analysis step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            3 => format!("This is a test template for PRD v1 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            4 => format!("This is a test template for PRD v2 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            5 => format!("This is a test template for architecture L1 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            6 => format!("This is a test template for architecture L2 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            7 => format!("This is a test template for explain architecture step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            8 => format!("This is a test template for TDD v1 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            _ => unreachable!(),
+        };
         fs::write(templates_path.join(&full_template_name), template_content)?;
     }
     
@@ -111,6 +117,9 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
     
     // Create a mock LLM provider
     let llm_provider = MockLLMProvider::new();
+    
+    // Reset the counter
+    llm_provider.reset_counter();
     
     // Load templates
     let tera = load_templates(Some(&templates_path))?;
@@ -140,6 +149,9 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
         assert_eq!(file_content, expected_content, "Content for step {} should match mock response", step);
     }
     
+    // Set the step for GitHub issues plan
+    llm_provider.set_step(9);
+    
     // Test GitHub issues plan generation
     generate_github_issues_plan(&llm_provider, &docs_path, &tera).await?;
     
@@ -158,7 +170,10 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_workflow_step_1() {
     // Create a mock LLM provider
-    let mut mock_provider = MockLLMProvider::new();
+    let mock_provider = MockLLMProvider::new();
+    
+    // Set the step
+    mock_provider.set_step(1);
 
     // Create a temporary directory for test files
     let temp_dir = tempfile::tempdir().unwrap();
