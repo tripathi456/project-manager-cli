@@ -41,26 +41,47 @@ impl MockLLMProvider {
 #[async_trait]
 impl LLMProvider for MockLLMProvider {
     async fn call_api(&self, prompt: &str) -> Result<String, Box<dyn Error>> {
+        // Print the prompt for debugging
+        println!("DEBUG - Prompt received: {}", prompt);
+        
+        // Convert prompt to lowercase for case-insensitive matching
+        let prompt_lower = prompt.to_lowercase();
+        
         // Extract step number from the prompt if possible
-        let step = if prompt.contains("domain analysis") {
-            2
-        } else if prompt.contains("PRD v1") {
+        // Check for specific template identifiers first, before checking content that might appear in previous outputs
+        let step = if prompt_lower.contains("prd v1 step") {
+            println!("DEBUG - Matched step 3 (prd v1)");
             3
-        } else if prompt.contains("PRD v2") {
+        } else if prompt_lower.contains("prd v2 step") {
+            println!("DEBUG - Matched step 4 (prd v2)");
             4
-        } else if prompt.contains("architecture L1") {
+        } else if prompt_lower.contains("architecture l1 step") {
+            println!("DEBUG - Matched step 5 (architecture l1)");
             5
-        } else if prompt.contains("architecture L2") {
+        } else if prompt_lower.contains("architecture l2 step") {
+            println!("DEBUG - Matched step 6 (architecture l2)");
             6
-        } else if prompt.contains("explain architecture") {
+        } else if prompt_lower.contains("explain architecture step") {
+            println!("DEBUG - Matched step 7 (explain architecture)");
             7
-        } else if prompt.contains("TDD v1") {
+        } else if prompt_lower.contains("tdd v1 step") {
+            println!("DEBUG - Matched step 8 (tdd v1)");
             8
-        } else if prompt.contains("GitHub Issues") {
+        } else if prompt_lower.contains("github issues") {
+            println!("DEBUG - Matched step 9 (github issues)");
             9
+        } else if prompt_lower.contains("domain analysis step") {
+            println!("DEBUG - Matched step 2 (domain analysis)");
+            2
+        } else if prompt_lower.contains("initial ideation step") {
+            println!("DEBUG - Matched step 1 (initial ideation)");
+            1
         } else {
+            println!("DEBUG - No match found, defaulting to step 1");
             1
         };
+        
+        println!("DEBUG - Returning response for step {}", step);
         
         // Return the corresponding mock response
         Ok(self.responses.get(&step).unwrap_or(&"Default mock response".to_string()).clone())
@@ -101,13 +122,26 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
         };
         
         let full_template_name = format!("{}{}", template_name, template_file);
-        let template_content = format!("This is a test template for step {}.\n\nPrevious output: {{{{ previous_output }}}}", step);
+        
+        // Create template content with the appropriate keywords for each step
+        let template_content = match step {
+            1 => format!("This is a test template for initial ideation step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            2 => format!("This is a test template for domain analysis step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            3 => format!("This is a test template for PRD v1 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            4 => format!("This is a test template for PRD v2 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            5 => format!("This is a test template for architecture L1 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            6 => format!("This is a test template for architecture L2 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            7 => format!("This is a test template for explain architecture step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            8 => format!("This is a test template for TDD v1 step {}.\n\nPrevious output: {{{{ previous_output }}}}", step),
+            _ => unreachable!(),
+        };
+        
         fs::write(templates_path.join(&full_template_name), template_content)?;
     }
     
     // Create GitHub issues plan template
     fs::write(templates_path.join("github_issues_plan.jinja"), 
-             "GitHub Issues Plan template\n\nTDD Content: {{ tdd_content }}")?;
+             "GitHub Issues Plan template for generating GitHub Issues\n\nTDD Content: {{ tdd_content }}")?;
     
     // Create a mock LLM provider
     let llm_provider = MockLLMProvider::new();
