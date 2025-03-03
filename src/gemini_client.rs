@@ -47,6 +47,11 @@ impl GeminiClient {
             self.api_url, model, self.api_key
         );
 
+        // Print the request before sending
+        println!("Sending request to Gemini API:");
+        println!("URL: {}", url);
+        println!("Request: {}", serde_json::to_string_pretty(request).unwrap_or_else(|_| "Failed to serialize request".to_string()));
+
         let response = self.http_client.post(&url).json(request).send().await?;
 
         if response.status().is_success() {
@@ -138,16 +143,11 @@ impl GeminiClient {
             tools: Some(vec![ToolConfig::DynamicRetieval {
                 google_search_retrieval: DynamicRetrieval {
                     dynamic_retrieval_config: DynamicRetrievalConfig {
-                        mode: "live".to_string(),
+                        mode: "MODE_DYNAMIC".to_string(),
                         dynamic_threshold: 0.5,
                     },
                 },
             }]),
-            temperature: Some(1.0),
-            top_p: Some(0.95),
-            top_k: Some(40),
-            max_output_tokens: Some(8192),
-            response_mime_type: Some("text/plain".to_string()),
         };
 
         // Call the standard generate_content method
@@ -217,11 +217,6 @@ impl GeminiClient {
                 role: Role::User,
             }],
             tools: None,
-            temperature: Some(0.7),
-            top_p: Some(0.95),
-            top_k: Some(40),
-            max_output_tokens: Some(8192),
-            response_mime_type: Some("text/plain".to_string()),
         };
 
         let response = self
@@ -301,11 +296,6 @@ fn default_processor<'a>(
                 role: Role::User,
             }],
             tools: None,
-            temperature: Some(0.7),
-            top_p: Some(0.95),
-            top_k: Some(40),
-            max_output_tokens: Some(8192),
-            response_mime_type: Some("text/plain".to_string()),
         };
 
         let response = client
@@ -330,7 +320,7 @@ pub fn init_step_processors() {
     let mut processors: HashMap<u32, StepProcessor> = HashMap::new();
 
     // Step 2 (Domain Analysis) uses Google Search grounding
-    processors.insert(2, StepProcessor::DomainAnalysis);
+    // processors.insert(2, StepProcessor::DomainAnalysis);
 
     // For all other steps, we fall back to the default function-calling processor
 

@@ -18,6 +18,7 @@ pub enum Role {
 pub enum ToolConfig {
     #[serde(rename = "function_declaration")]
     FunctionDeclaration(ToolConfigFunctionDeclaration),
+    #[serde(rename_all = "camelCase")]
     DynamicRetieval {
         google_search_retrieval: DynamicRetrieval,
     },
@@ -45,15 +46,16 @@ pub struct ToolConfigFunctionDeclaration {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename = "google_search_retrieval")]
+#[serde(rename = "googleSearchRetrieval")]
 pub struct DynamicRetrieval {
     pub dynamic_retrieval_config: DynamicRetrievalConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename = "dynamic_retrieval_config")]
+#[serde(rename = "dynamicRetrievalConfig")]
 pub struct DynamicRetrievalConfig {
     pub mode: String,
+    #[serde(rename = "dynamicThreshold")]
     pub dynamic_threshold: f64,
 }
 
@@ -131,23 +133,6 @@ pub struct GenerateContentRequest {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<ToolConfig>>,
-
-    // The fields below are optional but parallel the Python
-    // "GenerateContentConfig" settings.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f64>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_p: Option<f64>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_k: Option<u32>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_output_tokens: Option<u32>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_mime_type: Option<String>,
 }
 
 // The rest of your existing types stay the same...

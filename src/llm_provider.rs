@@ -71,7 +71,7 @@ impl LLMProvider for GeminiProvider {
 
         // Use the step-specific processing
         let response = self.client.process_step(
-            "gemini-2.0-flash", 
+            "gemini-2.0-flash-001", 
             prompt, 
             step, 
             &self.function_handlers
