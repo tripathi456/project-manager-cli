@@ -55,3 +55,7 @@ temp/
 # Miscellaneous
 .cargo/
 .rustup/
+
+docs/
+docs_v2/
+global_call_docs/

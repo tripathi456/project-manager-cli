@@ -7,7 +7,7 @@ use tempfile::tempdir;
 // Import the necessary modules from the crate.
 use docgen::types::GenerateContentRequest;
 use docgen::llm_provider::LLMProvider;
-use docgen::pipeline::{PipelineStep, generate_github_issues_plan};
+use docgen::pipeline::PipelineStep;
 use docgen::template_loader::TemplateLoader;
 use docgen::workflow::{Workflow, WorkflowExecutor, WorkflowStep};
 
@@ -148,8 +148,8 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
     // Load templates using the TemplateLoader.
     let template_loader = TemplateLoader::from_directory(&templates_path)?;
     
-    // Run through each pipeline step from 2 to 8.
-    for step in 2..=8 {
+    // Run through each pipeline step from 2 to 9.
+    for step in 2..=9 {
         let pipeline_step = PipelineStep::new(step, &llm_provider, &docs_path, &template_loader);
         pipeline_step.run().await?;
         
@@ -169,25 +169,11 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
             6 => "Mock architecture L2 response",
             7 => "Mock architecture explanation response",
             8 => "Mock TDD v1 response",
+            9 => "Mock GitHub issues plan response",
             _ => unreachable!(),
         };
         assert_eq!(file_content, expected_content, "Content for step {} should match mock response", step);
     }
-    
-    // Test GitHub issues plan generation.
-    generate_github_issues_plan(&llm_provider, &docs_path, &template_loader).await?;
-    
-    // Verify GitHub issues plan file exists.
-    let github_issues_path = docs_path.join("github_issues_plan.md");
-    assert!(github_issues_path.exists(), "GitHub issues plan file should exist");
-    
-    // Verify content.
-    let github_issues_content = fs::read_to_string(&github_issues_path)?;
-    assert_eq!(
-        github_issues_content, 
-        "Mock GitHub issues plan response",
-        "GitHub issues plan content should match mock response"
-    );
     
     Ok(())
 }

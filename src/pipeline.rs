@@ -42,7 +42,6 @@ pub async fn generate_github_issues_plan<P: AsRef<Path>>(
     docs_path: P,
     template_loader: &dyn TemplateRenderer,
 ) -> Result<(), Box<dyn Error>> {
-    let workflow = Workflow::default_documentation();
-    let executor = WorkflowExecutor::new(workflow, template_loader, llm_provider);
-    executor.generate_github_issues_plan(docs_path).await
+    let pipeline_step = PipelineStep::new(9, llm_provider, docs_path, template_loader);
+    pipeline_step.run().await
 }

@@ -136,6 +136,15 @@ impl Workflow {
             "step_08_tdd_v1.jinja",
         ));
         
+        // Step 9: GitHub Issues Plan
+        workflow.add_step(WorkflowStep::new(
+            9,
+            "GitHub Issues Plan",
+            "github_issues_plan.md",
+            "r08_tdd_v1.txt",
+            "github_issues_plan.jinja",
+        ));
+        
         workflow
     }
 }
