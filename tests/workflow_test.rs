@@ -85,6 +85,11 @@ impl LLMProvider for MockLLMProvider {
         Ok(self.responses.get(&step)
             .unwrap_or(&"Default mock response".to_string()).clone())
     }
+
+    async fn call_api_for_step(&self, prompt: &str, step: u32) -> Result<String, Box<dyn Error>> {
+        // For testing purposes, we'll just call the regular call_api method
+        self.call_api(prompt).await
+    }
 }
 
 #[tokio::test]
@@ -103,7 +108,7 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
     
     // Create an initial ideation file.
     let initial_ideation_content = "# Initial Project Ideation\n\n## Project Name: Test Project\n\n## Project Description:\nThis is a test project description.\n\n## Key Features:\n- Feature 1\n- Feature 2\n";
-    fs::write(docs_path.join("r01_initial_ideation.txt"), initial_ideation_content)?;
+    fs::write(docs_path.join("r01_initial_ideation.md"), initial_ideation_content)?;
     
     // Create test template files for steps 1 to 8.
     for step in 1..=8 {
@@ -138,7 +143,7 @@ async fn test_documentation_workflow() -> Result<(), Box<dyn Error>> {
     
     // Create GitHub issues plan template.
     fs::write(
-        templates_path.join("github_issues_plan.jinja"),
+        templates_path.join("step_09_github_issues_plan.jinja"),
         "GitHub Issues Plan template for generating GitHub Issues\n\nTDD Content: {{ tdd_content }}"
     )?;
     
@@ -197,7 +202,7 @@ async fn test_workflow_executor() -> Result<(), Box<dyn Error>> {
     
     // Create an initial ideation file for testing.
     let initial_ideation_content = "# Test Initial Ideation";
-    fs::write(docs_path.join("r01_initial_ideation.txt"), initial_ideation_content)?;
+    fs::write(docs_path.join("r01_initial_ideation.md"), initial_ideation_content)?;
     
     // Create a mock LLM provider.
     let llm_provider = MockLLMProvider::new();
@@ -255,7 +260,7 @@ async fn test_workflow_step_2_context() -> Result<(), Box<dyn Error>> {
     
     // Create an initial ideation file.
     let initial_ideation_content = "# Initial Project Ideation";
-    fs::write(docs_path.join("r01_initial_ideation.txt"), initial_ideation_content)?;
+    fs::write(docs_path.join("r01_initial_ideation.md"), initial_ideation_content)?;
     
     // Create a mock LLM provider.
     let llm_provider = MockLLMProvider::new();

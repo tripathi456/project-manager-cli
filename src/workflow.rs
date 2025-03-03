@@ -259,16 +259,16 @@ impl<'a> WorkflowExecutor<'a> {
         });
         
         // Render the template
-        let prompt = self.template_loader.render_value("github_issues_plan.jinja", &ctx_map)?;
+        let prompt = self.template_loader.render_value("step_09_github_issues_plan.jinja", &ctx_map)?;
         
         // Log the prompt
         log_prompt("Prompt for GitHub issues plan:", &prompt);
         
         // Call the LLM provider
-        let response = self.llm_provider.call_api(&prompt).await?;
+        let response = self.llm_provider.call_api_for_step(&prompt, 9).await?;
         
         // Write the response to the output file
-        let output_path = docs_path.join("github_issues_plan.md");
+        let output_path = docs_path.join("step_09_github_issues_plan.md");
         fs::write(&output_path, &response)?;
         info!("GitHub issues plan generated. Output written to: {}", output_path.display());
         
