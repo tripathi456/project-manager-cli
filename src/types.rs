@@ -14,12 +14,6 @@ pub enum Role {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GenerateContentRequest {
-    pub contents: Vec<Content>,
-    pub tools: Option<Vec<ToolConfig>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ToolConfig {
     #[serde(rename = "function_declaration")]
@@ -129,3 +123,31 @@ pub struct FunctionResponse {
 pub struct FunctionResponsePayload {
     pub content: serde_json::Value,
 }
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateContentRequest {
+    pub contents: Vec<Content>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ToolConfig>>,
+
+    // The fields below are optional but parallel the Python
+    // "GenerateContentConfig" settings.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_k: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_mime_type: Option<String>,
+}
+
+// The rest of your existing types stay the same...

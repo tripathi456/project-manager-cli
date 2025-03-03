@@ -68,7 +68,7 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             1,
             "Initial Ideation",
-            "r01_initial_ideation.txt",
+            "r01_initial_ideation.md",
             "",
             "step_01_initial_ideation.jinja",
         ));
@@ -77,8 +77,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             2,
             "Domain Analysis",
-            "r02_domain_analysis.txt",
-            "r01_initial_ideation.txt",
+            "r02_domain_analysis.md",
+            "r01_initial_ideation.md",
             "step_02_domain_analysis.jinja",
         ));
         
@@ -86,8 +86,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             3,
             "PRD v1",
-            "r03_prd_v1.txt",
-            "r02_domain_analysis.txt",
+            "r03_prd_v1.md",
+            "r02_domain_analysis.md",
             "step_03_prd_v1.jinja",
         ));
         
@@ -95,8 +95,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             4,
             "PRD v2",
-            "r04_prd_v2.txt",
-            "r03_prd_v1.txt",
+            "r04_prd_v2.md",
+            "r03_prd_v1.md",
             "step_04_prd_v2.jinja",
         ));
         
@@ -104,8 +104,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             5,
             "Architecture L1",
-            "r05_arch_L1.txt",
-            "r04_prd_v2.txt",
+            "r05_arch_L1.md",
+            "r04_prd_v2.md",
             "step_05_arch_L1.jinja",
         ));
         
@@ -113,8 +113,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             6,
             "Architecture L2",
-            "r06_arch_L2.txt",
-            "r05_arch_L1.txt",
+            "r06_arch_L2.md",
+            "r05_arch_L1.md",
             "step_06_arch_L2.jinja",
         ));
         
@@ -122,8 +122,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             7,
             "Explain Architecture",
-            "r07_explain_architecture.txt",
-            "r06_arch_L2.txt",
+            "r07_explain_architecture.md",
+            "r06_arch_L2.md",
             "step_07_explain_architecture.jinja",
         ));
         
@@ -131,8 +131,8 @@ impl Workflow {
         workflow.add_step(WorkflowStep::new(
             8,
             "TDD v1",
-            "r08_tdd_v1.txt",
-            "r07_explain_architecture.txt",
+            "r08_tdd_v1.md",
+            "r07_explain_architecture.md",
             "step_08_tdd_v1.jinja",
         ));
         
@@ -141,8 +141,8 @@ impl Workflow {
             9,
             "GitHub Issues Plan",
             "github_issues_plan.md",
-            "r08_tdd_v1.txt",
-            "github_issues_plan.jinja",
+            "r08_tdd_v1.md",
+            "step_09_github_issues_plan.jinja",
         ));
         
         workflow
@@ -193,7 +193,7 @@ impl<'a> WorkflowExecutor<'a> {
             if !previous_file_path.exists() {
                 // For step 2, if r01 exists in docs directory, use that instead
                 if step_number == 2 {
-                    let r01_path = docs_path.join("r01_initial_ideation.txt");
+                    let r01_path = docs_path.join("r01_initial_ideation.md");
                     if r01_path.exists() {
                         let content = fs::read_to_string(&r01_path)?;
                         ctx_map.insert("previous_output".to_string(), content.clone());
@@ -227,7 +227,7 @@ impl<'a> WorkflowExecutor<'a> {
         log_prompt(&format!("Prompt for step {}:", step_number), &prompt);
         
         // Call the LLM provider
-        let response = self.llm_provider.call_api(&prompt).await?;
+        let response = self.llm_provider.call_api_for_step(&prompt, step_number).await?;
         
         // Write the response to the output file
         let output_path = docs_path.join(&step.output_file);
@@ -245,7 +245,7 @@ impl<'a> WorkflowExecutor<'a> {
         let docs_path = docs_path.as_ref();
         
         // Read the TDD content
-        let tdd_path = docs_path.join("r08_tdd_v1.txt");
+        let tdd_path = docs_path.join("r08_tdd_v1.md");
         if !tdd_path.exists() {
             error!("TDD file does not exist: {}", tdd_path.display());
             return Err(format!("TDD file does not exist: {}", tdd_path.display()).into());
@@ -298,7 +298,13 @@ mod tests {
         pub LLMProviderMock {}
         #[async_trait::async_trait]
         impl LLMProvider for LLMProviderMock {
-            async fn call_api(&self, prompt: &str) -> Result<String, Box<dyn Error>>;
+            async fn call_api(&self, prompt: &str) -> Result<String, Box<dyn Error>> {
+                Ok("Test response".to_string())
+            }
+            
+            async fn call_api_for_step(&self, prompt: &str, step_number: u32) -> Result<String, Box<dyn Error>> {
+                Ok("Test response".to_string())
+            }
         }
     }
 
@@ -311,9 +317,9 @@ mod tests {
         // Create a mock LLM provider
         let mut llm_provider = MockLLMProviderMock::new();
         llm_provider
-            .expect_call_api()
-            .with(always())
-            .returning(|_| Ok("Test response".to_string()));
+            .expect_call_api_for_step()
+            .with(always(), always())
+            .returning(|_, _| Ok("Test response".to_string()));
             
         // Create a mock template renderer
         let mut template_renderer = MockTemplateRendererMock::new();
@@ -331,7 +337,7 @@ mod tests {
         assert!(result.is_ok());
         
         // Verify the output file exists
-        let output_path = temp_path.join("r01_initial_ideation.txt");
+        let output_path = temp_path.join("r01_initial_ideation.md");
         assert!(output_path.exists());
         
         // Verify the output content

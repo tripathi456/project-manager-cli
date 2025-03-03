@@ -1,22 +1,31 @@
 use std::env;
 use std::error::Error;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+
 use tracing::info;
+
 use async_trait::async_trait;
 
 use crate::types::{
     Content, ContentPart, GenerateContentRequest, GenerateContentResponse, PartResponse, Role
 };
-use crate::gemini_client::GeminiClient;
+use crate::gemini_client::{GeminiClient, GeminiError, init_step_processors};
 
 /// Asynchronous trait to represent an LLM provider.
 #[async_trait]
 pub trait LLMProvider {
     async fn call_api(&self, prompt: &str) -> Result<String, Box<dyn Error>>;
+    
+    /// Call the API with a specific step number to use step-specific processing
+    async fn call_api_for_step(&self, prompt: &str, step: u32) -> Result<String, Box<dyn Error>>;
 }
 
 /// A Gemini provider that implements the LLMProvider trait asynchronously.
 pub struct GeminiProvider {
     pub client: GeminiClient,
+    function_handlers: HashMap<String, Box<dyn Fn(&mut serde_json::Value) -> Result<serde_json::Value, String> + Send + Sync>>,
 }
 
 impl GeminiProvider {
@@ -24,14 +33,34 @@ impl GeminiProvider {
     pub fn new() -> Self {
         let api_key = env::var("GEMINI_API_KEY").unwrap_or_else(|_| "dummy_key".to_string());
         let client = GeminiClient::new(api_key);
-        Self { client }
+        
+        // Initialize step processors
+        init_step_processors();
+        
+        // Initialize function handlers (empty for now)
+        let function_handlers = HashMap::new();
+        
+        Self { client, function_handlers }
+    }
+    
+    /// Add a function handler
+    pub fn add_function_handler<F>(&mut self, name: &str, handler: F)
+    where
+        F: Fn(&mut serde_json::Value) -> Result<serde_json::Value, String> + Send + Sync + 'static,
+    {
+        self.function_handlers.insert(name.to_string(), Box::new(handler));
     }
 }
 
 #[async_trait]
 impl LLMProvider for GeminiProvider {
     async fn call_api(&self, prompt: &str) -> Result<String, Box<dyn Error>> {
-        info!("Calling Gemini API...");
+        // Default to step 0 (no special processing)
+        self.call_api_for_step(prompt, 0).await
+    }
+    
+    async fn call_api_for_step(&self, prompt: &str, step: u32) -> Result<String, Box<dyn Error>> {
+        info!("Calling Gemini API for step {}...", step);
         // Log just the first line for brevity
         let first_line = prompt.lines().next().unwrap_or("").to_string();
         if first_line.len() > 50 {
@@ -40,48 +69,22 @@ impl LLMProvider for GeminiProvider {
             info!("Prompt first line: {}", first_line);
         }
 
-        // Construct the request with one user message.
-        let request = GenerateContentRequest {
-            contents: vec![Content {
-                parts: vec![ContentPart::Text(prompt.to_string())],
-                role: Role::User,
-            }],
-            tools: None,
+        // Use the step-specific processing
+        let response = self.client.process_step(
+            "gemini-2.0-flash", 
+            prompt, 
+            step, 
+            &self.function_handlers
+        ).await?;
+        
+        let preview = if response.len() > 50 {
+            format!("{}...", &response[..50])
+        } else {
+            response.clone()
         };
-
-        let response: GenerateContentResponse = self
-            .client
-            .generate_content("gemini-2.0-flash", &request)
-            .await?;
-
-        // Extract and return the first text candidate from the response.
-        if let Some(candidates) = response.candidates {
-            if let Some(candidate) = candidates.first() {
-                if let Some(part) = candidate.content.parts.first() {
-                    return match part {
-                        PartResponse::Text(text) => {
-                            let preview = if text.len() > 50 {
-                                format!("{}...", &text[..50])
-                            } else {
-                                text.clone()
-                            };
-                            info!("Received response: {}", preview);
-                            Ok(text.clone())
-                        },
-                        PartResponse::FunctionCall(function_call) => Ok(format!(
-                            "Function call: {} with args: {}",
-                            function_call.name, function_call.arguments
-                        )),
-                        PartResponse::FunctionResponse(function_response) => Ok(format!(
-                            "Function response: {} with payload: {:?}",
-                            function_response.name, function_response.response.content
-                        )),
-                    };
-                }
-            }
-        }
-
-        Err("No valid candidate returned from Gemini API".into())
+        info!("Received response: {}", preview);
+        
+        Ok(response)
     }
 }
 

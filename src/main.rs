@@ -50,7 +50,8 @@ enum Commands {
     },
 }
 
-#[tokio::main]
+
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
