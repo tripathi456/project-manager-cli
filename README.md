@@ -36,8 +36,8 @@ DocGen follows a 9-step documentation pipeline:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/docgen.git
-cd docgen
+git clone https://github.com/tripathi456/project-manager-cli/
+cd project-manager-cli
 
 # Build the project
 cargo build --release
