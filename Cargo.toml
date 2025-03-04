@@ -2,6 +2,7 @@
 name = "docgen"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/tripathi456/project-manager-cli"
 
 [dependencies]
 async-trait = "0.1.86"
@@ -27,3 +28,8 @@ tracing-subscriber = {version =  "0.3.19", features = ["env-filter", "json", "fm
 [dev-dependencies]
 mockall = "0.13"
 tempfile = "3.10.1"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
