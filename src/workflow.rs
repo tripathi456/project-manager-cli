@@ -152,7 +152,6 @@ impl Workflow {
 /// A struct for executing a workflow of steps
 pub struct WorkflowExecutor<'a> {
     workflow: Workflow,
-    /// Now we can hold a trait object safely, because `TemplateRenderer` is object-safe
     template_loader: &'a dyn TemplateRenderer,
     llm_provider: &'a dyn LLMProvider,
 }
@@ -170,6 +169,7 @@ impl<'a> WorkflowExecutor<'a> {
         }
     }
     
+    /// Execute a specific step in the workflow
     pub async fn execute_step<P: AsRef<Path>>(
         &self,
         step_number: u32,
@@ -183,78 +183,151 @@ impl<'a> WorkflowExecutor<'a> {
         
         info!("Executing step {}: {}", step_number, step.description);
         
-        // Prepare a context as a HashMap<String, String>
-        let mut ctx_map = HashMap::new();
-        ctx_map.insert("current_step".to_string(), step_number.to_string());
+        // Prepare context for template rendering
+        let ctx_value = self.prepare_context(step, docs_path)?;
         
-        // For steps with dependencies, read the previous outputs
-        if !step.dependencies.is_empty() {
-            // For backward compatibility, use the first dependency as the "previous_output"
-            if let Some(first_dependency) = step.dependencies.first() {
-                let previous_file_path = docs_path.join(first_dependency);
-                if !previous_file_path.exists() {
-                    // For step 2, if r01 exists in docs directory, use that instead
-                    if step_number == 2 {
-                        let r01_path = docs_path.join("r01_initial_ideation.md");
-                        if r01_path.exists() {
-                            let content = fs::read_to_string(&r01_path)?;
-                            ctx_map.insert("previous_output".to_string(), content.clone());
-                            ctx_map.insert("initial_ideation".to_string(), content);
-                        } else {
-                            error!("Required input file does not exist: {}", previous_file_path.display());
-                            return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
-                        }
-                    } else {
-                        error!("Required input file does not exist: {}", previous_file_path.display());
-                        return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
-                    }
-                } else {
-                    let content = fs::read_to_string(&previous_file_path)?;
-                    ctx_map.insert("previous_output".to_string(), content.clone());
-                    
-                    // For step 2, also insert the initial ideation content
-                    if step_number == 2 {
-                        ctx_map.insert("initial_ideation".to_string(), content);
-                    }
-                }
-            }
-            
-            // Add all dependencies to the context
-            for dependency in &step.dependencies {
-                let dependency_path = docs_path.join(dependency);
-                if dependency_path.exists() {
-                    let content = fs::read_to_string(&dependency_path)?;
-                    // Use the filename without extension as the key
-                    let key = Path::new(dependency)
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    ctx_map.insert(key, content);
-                } else {
-                    // Return an error if a dependency is missing
-                    error!("Required dependency file does not exist: {}", dependency_path.display());
-                    return Err(format!("Required dependency file does not exist: {}", dependency_path.display()).into());
-                }
-            }
-        }
-        
-        // Convert the HashMap context to `serde_json::Value`.
-        let ctx_value = serde_json::to_value(&ctx_map)?;
-        
-        // Render the template using the new method
-        let prompt = self.template_loader.render_value(&step.template_file, &ctx_value)?;
+        // Render the template
+        let prompt = self.render_template(&step.template_file, &ctx_value)?;
         
         // Log the prompt
         log_prompt(&format!("Prompt for step {}:", step_number), &prompt);
         
+        // Call the LLM provider and write the response
+        self.process_llm_response(step, &prompt, docs_path).await?;
+        
+        Ok(())
+    }
+    
+    /// Prepare the context for template rendering
+    fn prepare_context(&self, step: &WorkflowStep, docs_path: &Path) -> Result<Value, Box<dyn Error>> {
+        let mut ctx_map = HashMap::new();
+        ctx_map.insert("current_step".to_string(), step.step_number.to_string());
+        
+        // For steps with dependencies, read the previous outputs
+        if !step.dependencies.is_empty() {
+            self.load_dependencies(step, docs_path, &mut ctx_map)?;
+        }
+        
+        // Convert the HashMap context to `serde_json::Value`
+        Ok(serde_json::to_value(&ctx_map)?)
+    }
+    
+    /// Load dependencies for a step
+    fn load_dependencies(
+        &self, 
+        step: &WorkflowStep, 
+        docs_path: &Path, 
+        ctx_map: &mut HashMap<String, String>
+    ) -> Result<(), Box<dyn Error>> {
+        // For backward compatibility, use the first dependency as the "previous_output"
+        if let Some(first_dependency) = step.dependencies.first() {
+            self.load_first_dependency(step, first_dependency, docs_path, ctx_map)?;
+        }
+        
+        // Add all dependencies to the context
+        self.load_all_dependencies(step, docs_path, ctx_map)?;
+        
+        Ok(())
+    }
+    
+    /// Load the first dependency with special handling for step 2
+    fn load_first_dependency(
+        &self,
+        step: &WorkflowStep,
+        first_dependency: &str,
+        docs_path: &Path,
+        ctx_map: &mut HashMap<String, String>
+    ) -> Result<(), Box<dyn Error>> {
+        let previous_file_path = docs_path.join(first_dependency);
+        
+        if !previous_file_path.exists() {
+            // Special handling for step 2
+            if step.step_number == 2 {
+                self.handle_step_2_dependency(docs_path, ctx_map)?;
+            } else {
+                error!("Required input file does not exist: {}", previous_file_path.display());
+                return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
+            }
+        } else {
+            let content = fs::read_to_string(&previous_file_path)?;
+            ctx_map.insert("previous_output".to_string(), content.clone());
+            
+            // For step 2, also insert the initial ideation content
+            if step.step_number == 2 {
+                ctx_map.insert("initial_ideation".to_string(), content);
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Special handling for step 2's dependency
+    fn handle_step_2_dependency(
+        &self,
+        docs_path: &Path,
+        ctx_map: &mut HashMap<String, String>
+    ) -> Result<(), Box<dyn Error>> {
+        let r01_path = docs_path.join("r01_initial_ideation.md");
+        if r01_path.exists() {
+            let content = fs::read_to_string(&r01_path)?;
+            ctx_map.insert("previous_output".to_string(), content.clone());
+            ctx_map.insert("initial_ideation".to_string(), content);
+            Ok(())
+        } else {
+            error!("Required input file does not exist: {}", r01_path.display());
+            Err(format!("Required input file does not exist: {}", r01_path.display()).into())
+        }
+    }
+    
+    /// Load all dependencies for a step
+    fn load_all_dependencies(
+        &self,
+        step: &WorkflowStep,
+        docs_path: &Path,
+        ctx_map: &mut HashMap<String, String>
+    ) -> Result<(), Box<dyn Error>> {
+        for dependency in &step.dependencies {
+            let dependency_path = docs_path.join(dependency);
+            if dependency_path.exists() {
+                let content = fs::read_to_string(&dependency_path)?;
+                // Use the filename without extension as the key
+                let key = Path::new(dependency)
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                ctx_map.insert(key, content);
+            } else {
+                // Return an error if a dependency is missing
+                error!("Required dependency file does not exist: {}", dependency_path.display());
+                return Err(format!("Required dependency file does not exist: {}", dependency_path.display()).into());
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Render a template with the given context
+    fn render_template(&self, template_file: &str, context: &Value) -> Result<String, Box<dyn Error>> {
+        self.template_loader.render_value(template_file, context)
+    }
+    
+    /// Process the LLM response and write it to the output file
+    async fn process_llm_response<P: AsRef<Path>>(
+        &self,
+        step: &WorkflowStep,
+        prompt: &str,
+        docs_path: P
+    ) -> Result<(), Box<dyn Error>> {
+        let docs_path = docs_path.as_ref();
+        
         // Call the LLM provider
-        let response = self.llm_provider.call_api_for_step(&prompt, step_number).await?;
+        let response = self.llm_provider.call_api_for_step(prompt, step.step_number).await?;
         
         // Write the response to the output file
         let output_path = docs_path.join(&step.output_file);
         fs::write(&output_path, &response)?;
-        info!("Step {} completed. Output written to: {}", step_number, output_path.display());
+        info!("Step {} completed. Output written to: {}", step.step_number, output_path.display());
         
         Ok(())
     }
@@ -267,21 +340,13 @@ impl<'a> WorkflowExecutor<'a> {
         let docs_path = docs_path.as_ref();
         
         // Read the TDD content
-        let tdd_path = docs_path.join("r08_tdd_v1.md");
-        if !tdd_path.exists() {
-            error!("TDD file does not exist: {}", tdd_path.display());
-            return Err(format!("TDD file does not exist: {}", tdd_path.display()).into());
-        }
+        let tdd_content = self.read_tdd_content(docs_path)?;
         
-        let tdd_content = fs::read_to_string(&tdd_path)?;
-        
-        // Convert it to JSON
-        let ctx_map = serde_json::json!({
-            "tdd_content": tdd_content
-        });
+        // Prepare context with TDD content
+        let ctx_map = self.prepare_github_issues_context(&tdd_content);
         
         // Render the template
-        let prompt = self.template_loader.render_value("step_09_github_issues_plan.jinja", &ctx_map)?;
+        let prompt = self.render_template("step_09_github_issues_plan.jinja", &ctx_map)?;
         
         // Log the prompt
         log_prompt("Prompt for GitHub issues plan:", &prompt);
@@ -290,8 +355,40 @@ impl<'a> WorkflowExecutor<'a> {
         let response = self.llm_provider.call_api_for_step(&prompt, 9).await?;
         
         // Write the response to the output file
-        let output_path = docs_path.join("step_09_github_issues_plan.md");
-        fs::write(&output_path, &response)?;
+        self.write_github_issues_plan(docs_path, &response)?;
+        
+        Ok(())
+    }
+    
+    /// Read the TDD content for GitHub issues plan
+    fn read_tdd_content<P: AsRef<Path>>(&self, docs_path: P) -> Result<String, Box<dyn Error>> {
+        let docs_path = docs_path.as_ref();
+        let tdd_path = docs_path.join("r08_tdd_v1.md");
+        
+        if !tdd_path.exists() {
+            error!("TDD file does not exist: {}", tdd_path.display());
+            return Err(format!("TDD file does not exist: {}", tdd_path.display()).into());
+        }
+        
+        Ok(fs::read_to_string(&tdd_path)?)
+    }
+    
+    /// Prepare context for GitHub issues plan
+    fn prepare_github_issues_context(&self, tdd_content: &str) -> Value {
+        serde_json::json!({
+            "tdd_content": tdd_content
+        })
+    }
+    
+    /// Write the GitHub issues plan to a file
+    fn write_github_issues_plan<P: AsRef<Path>>(
+        &self,
+        docs_path: P,
+        response: &str
+    ) -> Result<(), Box<dyn Error>> {
+        let docs_path = docs_path.as_ref();
+        let output_path = docs_path.join("github_issues_plan.md");
+        fs::write(&output_path, response)?;
         info!("GitHub issues plan generated. Output written to: {}", output_path.display());
         
         Ok(())
