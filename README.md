@@ -13,7 +13,7 @@ DocGen is a command-line tool that leverages Large Language Models (LLMs) to aut
 
 ## Documentation Pipeline
 
-DocGen follows an 8-step documentation pipeline:
+DocGen follows a 9-step documentation pipeline:
 
 1. **Initial Ideation**: Define your project's core concept, features, and goals.
 2. **Domain Analysis**: Analyze the problem domain and identify key entities and relationships.
@@ -76,15 +76,15 @@ docgen run --step 2 --prompt-folder /path/to/your/templates
 
 All documentation is saved to a `docs` folder in your current directory, with files named according to the step:
 
-- `r01_initial_ideation.txt`
-- `r02_domain_analysis.txt`
-- `r03_prd_v1.txt`
-- `r04_prd_v2.txt`
-- `r05_arch_L1.txt`
-- `r06_arch_L2.txt`
-- `r07_explain_architecture.txt`
-- `r08_tdd_v1.txt`
-- `github_issues_plan.md`
+- `r01_initial_ideation.md`
+- `r02_domain_analysis.md`
+- `r03_prd_v1.md`
+- `r04_prd_v2.md`
+- `r05_arch_L1.md`
+- `r06_arch_L2.md`
+- `r07_explain_architecture.md`
+- `r08_tdd_v1.md`
+- `step_09_github_issues_plan.md`
 
 ## Extending DocGen
 
