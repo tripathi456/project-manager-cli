@@ -96,3 +96,35 @@ Implementing GitHub issues plan generation as step 9 in the pipeline.
 - Pipeline step 2 should check both previous_file location and docs directory for r01_initial_ideation.txt
 - Template context variables should match between pipeline and template files
 - Implementing functionality as pipeline steps improves mental model and testability
+
+## Code Improvements - Issue #21
+
+### Changes Made
+
+1. **Removed Special Handling for Step 2's Dependency**:
+   - Eliminated the special `handle_step_2_dependency` method
+   - Integrated the special handling into the `load_all_dependencies` method
+   - Now using templates to handle step 2's dependency consistently with other steps
+
+2. **Removed Backward Compatibility Code**:
+   - Removed the code that used the first dependency as "previous_output"
+   - Updated `load_dependencies` to only call `load_all_dependencies`
+   - Removed the `load_first_dependency` method
+
+3. **Refactored GitHub Issues Plan Generation**:
+   - Removed the special `generate_github_issues_plan` method from WorkflowExecutor
+   - Removed helper methods: `read_tdd_content`, `prepare_github_issues_context`, and `write_github_issues_plan`
+   - GitHub issues plan generation is now handled as step 9 in the standard workflow
+
+### Benefits
+
+1. **Simplified Code**: Removed special case handling, making the code more maintainable.
+2. **Consistent Approach**: All steps now use the same template-based approach.
+3. **Reduced Duplication**: Eliminated duplicate code for handling dependencies and GitHub issues plan generation.
+4. **Better Testability**: Standard workflow steps are easier to test than special case methods.
+
+### Edge Cases Handled
+
+1. **Step 2 Dependencies**: The special handling for step 2 (using `initial_ideation`) is preserved but integrated into the standard workflow.
+2. **Previous Output Access**: First dependency is still set as "previous_output" for backward compatibility with templates.
+3. **Missing Dependencies**: Proper error handling for missing dependency files is maintained.
