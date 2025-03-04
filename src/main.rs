@@ -48,6 +48,12 @@ enum Commands {
         #[arg(long)]
         step: u32,
     },
+    /// Initialize a docs folder with an empty step_01 file.
+    Init {
+        /// Path to the documentation folder.
+        #[arg(long)]
+        docs_path: PathBuf,
+    },
 }
 
 
@@ -97,6 +103,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
             
             // Print the rendered template
             println!("{}", rendered);
+        }
+        Commands::Init { docs_path } => {
+            // Create the docs directory if it doesn't exist
+            if !docs_path.exists() {
+                info!("Creating docs directory: {}", docs_path.display());
+                fs::create_dir_all(docs_path)?;
+            }
+            
+            // Get the step_01 file name from the workflow
+            let workflow = Workflow::default_documentation();
+            let step_obj = workflow.get_step(1)
+                .ok_or_else(|| "Failed to get step 1 from workflow".to_string())?;
+            
+            // Create an empty file for step_01
+            let step_01_file_path = docs_path.join(&step_obj.output_file);
+            if !step_01_file_path.exists() {
+                info!("Creating empty file for step_01: {}", step_01_file_path.display());
+                fs::write(&step_01_file_path, "")?;
+                println!("Initialized docs folder with empty step_01 file at: {}", step_01_file_path.display());
+            } else {
+                println!("step_01 file already exists at: {}", step_01_file_path.display());
+            }
         }
     }
     
