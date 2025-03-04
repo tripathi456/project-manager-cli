@@ -217,7 +217,7 @@ async fn test_workflow_executor() -> Result<(), Box<dyn Error>> {
             1,
             "Test Step",
             "test_output.txt",
-            "",
+            vec![], // Empty dependencies for first step
             "test_template.jinja"
         )
     );

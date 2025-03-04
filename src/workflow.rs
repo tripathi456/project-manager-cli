@@ -15,7 +15,7 @@ pub struct WorkflowStep {
     pub step_number: u32,
     pub description: String,
     pub output_file: String,
-    pub previous_file: String,
+    pub dependencies: Vec<String>,
     pub template_file: String,
 }
 
@@ -24,14 +24,14 @@ impl WorkflowStep {
         step_number: u32,
         description: &str,
         output_file: &str,
-        previous_file: &str,
+        dependencies: Vec<&str>,
         template_file: &str,
     ) -> Self {
         Self {
             step_number,
             description: description.to_string(),
             output_file: output_file.to_string(),
-            previous_file: previous_file.to_string(),
+            dependencies: dependencies.iter().map(|&s| s.to_string()).collect(),
             template_file: template_file.to_string(),
         }
     }
@@ -69,7 +69,7 @@ impl Workflow {
             1,
             "Initial Ideation",
             "r01_initial_ideation.md",
-            "",
+            vec![],
             "step_01_initial_ideation.jinja",
         ));
         
@@ -78,7 +78,7 @@ impl Workflow {
             2,
             "Domain Analysis",
             "r02_domain_analysis.md",
-            "r01_initial_ideation.md",
+            vec!["r01_initial_ideation.md"],
             "step_02_domain_analysis.jinja",
         ));
         
@@ -87,7 +87,7 @@ impl Workflow {
             3,
             "PRD v1",
             "r03_prd_v1.md",
-            "r02_domain_analysis.md",
+            vec!["r02_domain_analysis.md"],
             "step_03_prd_v1.jinja",
         ));
         
@@ -96,7 +96,7 @@ impl Workflow {
             4,
             "PRD v2",
             "r04_prd_v2.md",
-            "r03_prd_v1.md",
+            vec!["r03_prd_v1.md"],
             "step_04_prd_v2.jinja",
         ));
         
@@ -105,7 +105,7 @@ impl Workflow {
             5,
             "Architecture L1",
             "r05_arch_L1.md",
-            "r04_prd_v2.md",
+            vec!["r04_prd_v2.md"],
             "step_05_arch_L1.jinja",
         ));
         
@@ -114,7 +114,7 @@ impl Workflow {
             6,
             "Architecture L2",
             "r06_arch_L2.md",
-            "r05_arch_L1.md",
+            vec!["r05_arch_L1.md"],
             "step_06_arch_L2.jinja",
         ));
         
@@ -123,7 +123,7 @@ impl Workflow {
             7,
             "Explain Architecture",
             "r07_explain_architecture.md",
-            "r06_arch_L2.md",
+            vec!["r06_arch_L2.md"],
             "step_07_explain_architecture.jinja",
         ));
         
@@ -132,7 +132,7 @@ impl Workflow {
             8,
             "TDD v1",
             "r08_tdd_v1.md",
-            "r07_explain_architecture.md",
+            vec!["r07_explain_architecture.md"],
             "step_08_tdd_v1.jinja",
         ));
         
@@ -141,7 +141,7 @@ impl Workflow {
             9,
             "GitHub Issues Plan",
             "github_issues_plan.md",
-            "r08_tdd_v1.md",
+            vec!["r08_tdd_v1.md"],
             "step_09_github_issues_plan.jinja",
         ));
         
@@ -187,32 +187,50 @@ impl<'a> WorkflowExecutor<'a> {
         let mut ctx_map = HashMap::new();
         ctx_map.insert("current_step".to_string(), step_number.to_string());
         
-        // For steps after the first, read the previous output
-        if !step.previous_file.is_empty() {
-            let previous_file_path = docs_path.join(&step.previous_file);
-            if !previous_file_path.exists() {
-                // For step 2, if r01 exists in docs directory, use that instead
-                if step_number == 2 {
-                    let r01_path = docs_path.join("r01_initial_ideation.md");
-                    if r01_path.exists() {
-                        let content = fs::read_to_string(&r01_path)?;
-                        ctx_map.insert("previous_output".to_string(), content.clone());
-                        ctx_map.insert("initial_ideation".to_string(), content);
+        // For steps with dependencies, read the previous outputs
+        if !step.dependencies.is_empty() {
+            // For backward compatibility, use the first dependency as the "previous_output"
+            if let Some(first_dependency) = step.dependencies.first() {
+                let previous_file_path = docs_path.join(first_dependency);
+                if !previous_file_path.exists() {
+                    // For step 2, if r01 exists in docs directory, use that instead
+                    if step_number == 2 {
+                        let r01_path = docs_path.join("r01_initial_ideation.md");
+                        if r01_path.exists() {
+                            let content = fs::read_to_string(&r01_path)?;
+                            ctx_map.insert("previous_output".to_string(), content.clone());
+                            ctx_map.insert("initial_ideation".to_string(), content);
+                        } else {
+                            error!("Required input file does not exist: {}", previous_file_path.display());
+                            return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
+                        }
                     } else {
                         error!("Required input file does not exist: {}", previous_file_path.display());
                         return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
                     }
                 } else {
-                    error!("Required input file does not exist: {}", previous_file_path.display());
-                    return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
+                    let content = fs::read_to_string(&previous_file_path)?;
+                    ctx_map.insert("previous_output".to_string(), content.clone());
+                    
+                    // For step 2, also insert the initial ideation content
+                    if step_number == 2 {
+                        ctx_map.insert("initial_ideation".to_string(), content);
+                    }
                 }
-            } else {
-                let content = fs::read_to_string(&previous_file_path)?;
-                ctx_map.insert("previous_output".to_string(), content.clone());
-                
-                // For step 2, also insert the initial ideation content
-                if step_number == 2 {
-                    ctx_map.insert("initial_ideation".to_string(), content);
+            }
+            
+            // Add all dependencies to the context
+            for dependency in &step.dependencies {
+                let dependency_path = docs_path.join(dependency);
+                if dependency_path.exists() {
+                    let content = fs::read_to_string(&dependency_path)?;
+                    // Use the filename without extension as the key
+                    let key = Path::new(dependency)
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    ctx_map.insert(key, content);
                 }
             }
         }
