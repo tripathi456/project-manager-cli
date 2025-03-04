@@ -276,7 +276,7 @@ async fn test_workflow_step_2_context() -> Result<(), Box<dyn Error>> {
     engine.execute_step(2, &docs_path).await?;
     
     // Verify that the output file exists.
-    let output_path = docs_path.join("r02_domain_analysis.txt");
+    let output_path = docs_path.join("r02_domain_analysis.md");
     assert!(output_path.exists(), "Domain analysis output file should exist");
     
     // (The debug output from the mock provider will confirm that the prompt contained the initial ideation content.)
