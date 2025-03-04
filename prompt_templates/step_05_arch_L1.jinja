@@ -10,7 +10,7 @@ STEP {{ current_step }}: Architecture L1
 1. Propose a high-level (L1) architecture that satisfies the PRD v2 requirements.  
 2. Identify main components and their responsibilities.  
 3. Keep it at a system diagram level: what external services, data flows, or modules are needed?
-4. Generate a correct Mermaid diagram without syntax errors, ensuring no unexpected dashed lines (--) before text labels.
+4. Generate a correct Mermaid diagram without syntax errors, ensuring no unexpected dashed lines (--) before text labels.  Mermaid diagram parser is having trouble with the { and } characters in file paths. Mermaid uses {} to denote decision points in flowcharts, so it's interpreting these as invalid syntax in a node label.
 
 **Constraints/Guidelines**:  
 - Must be consistent with PRD v2.  

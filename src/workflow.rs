@@ -105,7 +105,7 @@ impl Workflow {
             5,
             "Architecture L1",
             "r05_arch_L1.md",
-            vec!["r04_prd_v2.md"],
+            vec!["r04_prd_v2.md", "r02_domain_analysis.md"],
             "step_05_arch_L1.jinja",
         ));
         
@@ -114,7 +114,7 @@ impl Workflow {
             6,
             "Architecture L2",
             "r06_arch_L2.md",
-            vec!["r05_arch_L1.md"],
+            vec!["r05_arch_L1.md","r04_prd_v2.md"],
             "step_06_arch_L2.jinja",
         ));
         
@@ -132,7 +132,7 @@ impl Workflow {
             8,
             "TDD v1",
             "r08_tdd_v1.md",
-            vec!["r07_explain_architecture.md"],
+            vec!["r06_arch_L2.md","r04_prd_v2.md","r07_explain_architecture.md"],
             "step_08_tdd_v1.jinja",
         ));
         
@@ -141,7 +141,7 @@ impl Workflow {
             9,
             "GitHub Issues Plan",
             "github_issues_plan.md",
-            vec!["r08_tdd_v1.md"],
+            vec!["r08_tdd_v1.md","r06_arch_L2.md"],
             "step_09_github_issues_plan.jinja",
         ));
         
