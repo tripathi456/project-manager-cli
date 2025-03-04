@@ -231,6 +231,10 @@ impl<'a> WorkflowExecutor<'a> {
                         .to_string_lossy()
                         .to_string();
                     ctx_map.insert(key, content);
+                } else {
+                    // Return an error if a dependency is missing
+                    error!("Required dependency file does not exist: {}", dependency_path.display());
+                    return Err(format!("Required dependency file does not exist: {}", dependency_path.display()).into());
                 }
             }
         }
