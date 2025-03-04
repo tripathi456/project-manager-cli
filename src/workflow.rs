@@ -219,64 +219,10 @@ impl<'a> WorkflowExecutor<'a> {
         docs_path: &Path, 
         ctx_map: &mut HashMap<String, String>
     ) -> Result<(), Box<dyn Error>> {
-        // For backward compatibility, use the first dependency as the "previous_output"
-        if let Some(first_dependency) = step.dependencies.first() {
-            self.load_first_dependency(step, first_dependency, docs_path, ctx_map)?;
-        }
-        
         // Add all dependencies to the context
         self.load_all_dependencies(step, docs_path, ctx_map)?;
         
         Ok(())
-    }
-    
-    /// Load the first dependency with special handling for step 2
-    fn load_first_dependency(
-        &self,
-        step: &WorkflowStep,
-        first_dependency: &str,
-        docs_path: &Path,
-        ctx_map: &mut HashMap<String, String>
-    ) -> Result<(), Box<dyn Error>> {
-        let previous_file_path = docs_path.join(first_dependency);
-        
-        if !previous_file_path.exists() {
-            // Special handling for step 2
-            if step.step_number == 2 {
-                self.handle_step_2_dependency(docs_path, ctx_map)?;
-            } else {
-                error!("Required input file does not exist: {}", previous_file_path.display());
-                return Err(format!("Required input file does not exist: {}", previous_file_path.display()).into());
-            }
-        } else {
-            let content = fs::read_to_string(&previous_file_path)?;
-            ctx_map.insert("previous_output".to_string(), content.clone());
-            
-            // For step 2, also insert the initial ideation content
-            if step.step_number == 2 {
-                ctx_map.insert("initial_ideation".to_string(), content);
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// Special handling for step 2's dependency
-    fn handle_step_2_dependency(
-        &self,
-        docs_path: &Path,
-        ctx_map: &mut HashMap<String, String>
-    ) -> Result<(), Box<dyn Error>> {
-        let r01_path = docs_path.join("r01_initial_ideation.md");
-        if r01_path.exists() {
-            let content = fs::read_to_string(&r01_path)?;
-            ctx_map.insert("previous_output".to_string(), content.clone());
-            ctx_map.insert("initial_ideation".to_string(), content);
-            Ok(())
-        } else {
-            error!("Required input file does not exist: {}", r01_path.display());
-            Err(format!("Required input file does not exist: {}", r01_path.display()).into())
-        }
     }
     
     /// Load all dependencies for a step
@@ -290,13 +236,24 @@ impl<'a> WorkflowExecutor<'a> {
             let dependency_path = docs_path.join(dependency);
             if dependency_path.exists() {
                 let content = fs::read_to_string(&dependency_path)?;
+                
                 // Use the filename without extension as the key
                 let key = Path::new(dependency)
                     .file_stem()
                     .unwrap_or_default()
                     .to_string_lossy()
                     .to_string();
-                ctx_map.insert(key, content);
+                ctx_map.insert(key.clone(), content.clone());
+                
+                // If this is the first dependency, also set it as previous_output
+                if dependency == step.dependencies.first().unwrap() {
+                    ctx_map.insert("previous_output".to_string(), content.clone());
+                    
+                    // For step 2, also insert the initial ideation content
+                    if step.step_number == 2 && key == "r01_initial_ideation" {
+                        ctx_map.insert("initial_ideation".to_string(), content);
+                    }
+                }
             } else {
                 // Return an error if a dependency is missing
                 error!("Required dependency file does not exist: {}", dependency_path.display());
@@ -331,69 +288,7 @@ impl<'a> WorkflowExecutor<'a> {
         
         Ok(())
     }
-    
-    /// Generate a plan for GitHub issues
-    pub async fn generate_github_issues_plan<P: AsRef<Path>>(
-        &self,
-        docs_path: P
-    ) -> Result<(), Box<dyn Error>> {
-        let docs_path = docs_path.as_ref();
-        
-        // Read the TDD content
-        let tdd_content = self.read_tdd_content(docs_path)?;
-        
-        // Prepare context with TDD content
-        let ctx_map = self.prepare_github_issues_context(&tdd_content);
-        
-        // Render the template
-        let prompt = self.render_template("step_09_github_issues_plan.jinja", &ctx_map)?;
-        
-        // Log the prompt
-        log_prompt("Prompt for GitHub issues plan:", &prompt);
-        
-        // Call the LLM provider
-        let response = self.llm_provider.call_api_for_step(&prompt, 9).await?;
-        
-        // Write the response to the output file
-        self.write_github_issues_plan(docs_path, &response)?;
-        
-        Ok(())
     }
-    
-    /// Read the TDD content for GitHub issues plan
-    fn read_tdd_content<P: AsRef<Path>>(&self, docs_path: P) -> Result<String, Box<dyn Error>> {
-        let docs_path = docs_path.as_ref();
-        let tdd_path = docs_path.join("r08_tdd_v1.md");
-        
-        if !tdd_path.exists() {
-            error!("TDD file does not exist: {}", tdd_path.display());
-            return Err(format!("TDD file does not exist: {}", tdd_path.display()).into());
-        }
-        
-        Ok(fs::read_to_string(&tdd_path)?)
-    }
-    
-    /// Prepare context for GitHub issues plan
-    fn prepare_github_issues_context(&self, tdd_content: &str) -> Value {
-        serde_json::json!({
-            "tdd_content": tdd_content
-        })
-    }
-    
-    /// Write the GitHub issues plan to a file
-    fn write_github_issues_plan<P: AsRef<Path>>(
-        &self,
-        docs_path: P,
-        response: &str
-    ) -> Result<(), Box<dyn Error>> {
-        let docs_path = docs_path.as_ref();
-        let output_path = docs_path.join("github_issues_plan.md");
-        fs::write(&output_path, response)?;
-        info!("GitHub issues plan generated. Output written to: {}", output_path.display());
-        
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod tests {
